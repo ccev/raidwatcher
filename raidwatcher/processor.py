@@ -100,6 +100,7 @@ class RaidProcessor:
                     )
                     gym = self._gym_cache.get(proto.raid_info.raid_seed)
                     entry.embed.update(proto, gym)
+                    entry.player_count = proto.num_players_in_lobby
                     await entry.edit()
 
                 elif entry is None and proto.num_players_in_lobby > 0:

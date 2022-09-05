@@ -27,3 +27,16 @@ POST-requests with the body looking as follows.
     ]
 }
 ```
+
+### Shortcomings
+
+There's no way to know how long a lobby lasts without joining it, which I don't 
+think is something we want to do. Raid Watcher will cache any Raid for 120s 
+and update it if the player count changes. So sometimes it will process a new 
+lobby as if it were an old one.
+
+GetRaidDetailsProtos do not contain any information about the Gym. So Raid 
+Watcher has to also listen for GymGetInfoProtos. If one comes in that has an 
+active Raid, it will cache Gym information based on the Raid Seed for one hour. 
+This means that it's possible to get messages without any Gym info. These will be updated 
+if a later GymGetInfoProto is received.

@@ -13,5 +13,17 @@ It will keep these messages updated if the player count changes.
 - Clone, `pip install -r requirements.txt`,
 `cp config.example.toml config.toml` and fill out the config
 - I think this requires at least Python 3.10, though 3.9 could work too
-- Redirect any raw protos to `http://<host>:<port>/raw`. They must follow the
-RDM raw format
+- Redirect any raw protos to `http://<host>:<port>/raw`. They must be 
+POST-requests with the body looking as follows.
+
+```js
+{
+    "contents": [
+        {
+            "type": 1,      // method id
+            "payload": ""   // raw message
+        },
+        // ...
+    ]
+}
+```

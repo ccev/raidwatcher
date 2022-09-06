@@ -55,7 +55,8 @@ class RawInput:
 
             try:
                 proto = message().parse(decoded)
-                self.queue.put_nowait(proto)
+                lat, lon = data.get("lat", 0), data.get("lon", 0)
+                self.queue.put_nowait((proto, lat, lon))
             except Exception as e:
                 log.exception(f"Unknown error while parsing proto {raw_proto}", e)
                 continue

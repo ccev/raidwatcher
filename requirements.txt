@@ -5,3 +5,4 @@ loguru~=0.6.0
 rtoml~=0.8.0
 pydantic~=1.10.2
 aiohttp~=3.8.1
+shapely~=1.8.4

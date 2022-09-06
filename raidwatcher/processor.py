@@ -56,39 +56,26 @@ class CacheEntry:
 class Gym:
     name: str
     url: str
+    lat: float
+    lon: float
 
 
 class RaidProcessor:
     _session: aiohttp.ClientSession
 
     def __init__(self, queue: asyncio.Queue):
-        self._input_queue: "asyncio.Queue[GymGetInfoOutProto | GetRaidDetailsOutProto]" = queue
+        self._input_queue: "asyncio.Queue[tuple[GymGetInfoOutProto | GetRaidDetailsOutProto, float, float]]" = queue
         self._webhook_cache: TTLCache[int, CacheEntry] = TTLCache(maxsize=10000, ttl=120)
         self._gym_cache: TTLCache[int, Gym] = TTLCache(maxsize=1000000, ttl=60 * 60)
         self._uicons = UIconManager()
 
         asyncio.create_task(self._process_queue())
 
-    async def _send_webhook(self, embed: RaidEmbed, pokemon: PokemonProto) -> list[discord.WebhookMessage]:
-        icon = uicons.pokemon(pokemon)
-        try:
-            enum_name = HoloPokemonId(pokemon.pokemon_id).name
-        except (KeyError, IndexError):
-            enum_name = "Unknown"
-        name = "Active " + enum_name.replace("_", " ").title() + " Raid"
-
-        messages = []
-        for url in config.discord_webhooks:
-            webhook = discord.Webhook.from_url(url=url, session=self._session)
-            message = await webhook.send(embed=embed, wait=True, username=name, avatar_url=icon)
-            messages.append(message)
-        return messages
-
     async def _process_queue(self):
         self._session = aiohttp.ClientSession()
 
         while True:
-            proto = await self._input_queue.get()
+            proto, lat, lon = await self._input_queue.get()
 
             if isinstance(proto, GetRaidDetailsOutProto):
                 entry = self._webhook_cache.get(proto.raid_info.raid_seed)
@@ -103,11 +90,33 @@ class RaidProcessor:
                     entry.player_count = proto.num_players_in_lobby
                     await entry.edit()
 
+                    if proto.num_players_in_lobby == 0:
+                        del self._webhook_cache[proto.raid_info.raid_seed]
+
                 elif entry is None and proto.num_players_in_lobby > 0:
                     log.info(f"Sending new Raid {proto.raid_info.raid_seed}")
                     gym = self._gym_cache.get(proto.raid_info.raid_seed)
                     embed = RaidEmbed(proto, gym)
-                    messages = await self._send_webhook(embed, proto.raid_info.raid_pokemon)
+
+                    icon = uicons.pokemon(proto.raid_info.raid_pokemon)
+                    try:
+                        enum_name = HoloPokemonId(proto.raid_info.raid_pokemon.pokemon_id).name
+                    except (KeyError, IndexError):
+                        enum_name = "Unknown"
+                    name = "Active " + enum_name.replace("_", " ").title() + " Raid"
+                    messages = []
+
+                    for area in config.area:
+                        if not (
+                            area.name == "GLOBAL" or (area.geofence is not None and area.geofence.contains(lat, lon))
+                        ):
+                            continue
+
+                        for url in area.webhooks:
+                            webhook = discord.Webhook.from_url(url=url, session=self._session)
+                            message = await webhook.send(embed=embed, wait=True, username=name, avatar_url=icon)
+                            messages.append(message)
+
                     entry = CacheEntry(embed=embed, messages=messages, player_count=proto.num_players_in_lobby)
                     self._webhook_cache[proto.raid_info.raid_seed] = entry
 
@@ -122,7 +131,7 @@ class RaidProcessor:
                 if raid_seed in self._gym_cache:
                     continue
 
-                gym = Gym(name=proto.name, url=proto.url)
+                gym = Gym(name=proto.name, url=proto.url, lat=fort.latitude, lon=fort.longitude)
                 self._gym_cache[raid_seed] = gym
 
                 entry = self._webhook_cache.get(raid_seed)

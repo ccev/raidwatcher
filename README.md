@@ -18,6 +18,8 @@ POST-requests with the body looking as follows.
 
 ```js
 {
+    "lat": 0.0,
+    "lon": 0.0,    
     "contents": [
         {
             "type": 1,      // method id

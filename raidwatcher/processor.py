@@ -124,8 +124,6 @@ class RaidProcessor:
                 fort = proto.gym_status_and_defenders.pokemon_fort_proto
                 if not serialized_on_wire(fort.raid_info):
                     continue
-                if not serialized_on_wire(fort.raid_info.raid_pokemon):
-                    continue
 
                 raid_seed = fort.raid_info.raid_seed
                 if raid_seed in self._gym_cache:
